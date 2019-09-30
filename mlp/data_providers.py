@@ -199,21 +199,30 @@ class MetOfficeDataProvider(DataProvider):
             'Data file does not exist at expected path: ' + data_path
         )
         # load raw data from text file
-        data = np.loadtxt(data_path, skiprows=3)
-        data = data[:, 3:]
+        data = np.loadtxt(data_path, skiprows=3, usecols=range(2, 32))
+        assert window_size > 1, 'window size must be at least 2'
+        self.window_size = window_size
+        
         # filter out all missing datapoints and flatten to a vector
-        data = data[data != -99.99]
+        data = data[data >= 0].flatten()
 
         # normalise data to zero mean, unit standard deviation
-        normed = (data - data.mean(axis=0)) / data.std(axis=0)
+        mean = data - data.mean(axis=0)
+        std = data.std(axis=0)
+        normalised = mean / std
+        print(normalised, normalised.shape)
+        
         # convert from flat sequence to windowed data
-        # ...
+        shape = normalised.shape[:-1] + (normalised.shape[-1] - self.window_size + 1, self.window_size)
+        strides = normalised.strides + (normalised.strides[-1],)
+        windowed = np.lib.stride_tricks.as_strided(normalised, shape=shape, strides=strides)
+
         # inputs are first (window_size - 1) entries in windows
-        # inputs = ...
+        inputs = windowed[:, :-1] 
         # targets are last entry in windows
-        # targets = ...
+        targets = windowed[:, -1] 
         # initialise base class with inputs and targets arrays
-        # super(MetOfficeDataProvider, self).__init__(
-        #     inputs, targets, batch_size, max_num_batches, shuffle_order, rng)
+        super(MetOfficeDataProvider, self).__init__(
+            inputs, targets, batch_size, max_num_batches, shuffle_order, rng)
     def __next__(self):
             return self.next()
