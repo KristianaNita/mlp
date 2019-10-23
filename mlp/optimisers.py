@@ -18,7 +18,7 @@ class Optimiser(object):
     """Basic model optimiser."""
 
     def __init__(self, model, error, learning_rule, train_dataset,
-                 valid_dataset=None, data_monitors=None, notebook=False):
+                 valid_dataset=None, test_dataset=False, data_monitors=None, notebook=False):
         """Create a new optimiser instance.
 
         Args:
@@ -40,6 +40,7 @@ class Optimiser(object):
         self.learning_rule.initialise(self.model.params)
         self.train_dataset = train_dataset
         self.valid_dataset = valid_dataset
+        self.test_dataset = test_dataset
         self.data_monitors = OrderedDict([('error', error)])
         if data_monitors is not None:
             self.data_monitors.update(data_monitors)
@@ -66,6 +67,24 @@ class Optimiser(object):
                     activations, grads_wrt_outputs)
                 self.learning_rule.update_params(grads_wrt_params)
                 train_progress_bar.update(1)
+
+    def do_test_epoch(self):
+        """Do a single training epoch.
+
+        This iterates through all batches in training dataset, for each
+        calculating the gradient of the estimated error given the batch with
+        respect to all the model parameters and then updates the model
+        parameters according to the learning rule.
+        """
+        with self.tqdm_progress(total=self.test_dataset.num_batches) as test_progress_bar:
+            test_progress_bar.set_description("Ep Prog")
+            for inputs_batch, targets_batch in self.test_dataset:
+                activations = self.model.fprop(inputs_batch)
+                grads_wrt_outputs = self.error.grad(activations[-1], targets_batch)
+                grads_wrt_params = self.model.grads_wrt_params(
+                    activations, grads_wrt_outputs)
+                self.learning_rule.update_params(grads_wrt_params)
+                test_progress_bar.update(1)
 
     def eval_monitors(self, dataset, label):
         """Evaluates the monitors for the given dataset.
@@ -100,6 +119,9 @@ class Optimiser(object):
         if self.valid_dataset is not None:
             epoch_stats.update(self.eval_monitors(
                 self.valid_dataset, '(valid)'))
+        if self.test_dataset is not None:
+            epoch_stats.update(self.eval_monitors(
+                self.test_dataset, '(test)'))
         return epoch_stats
 
     def log_stats(self, epoch, epoch_time, stats):
@@ -115,7 +137,7 @@ class Optimiser(object):
             ', '.join(['{}={:.2e}'.format(k, v) for (k, v) in stats.items()])
         ))
 
-    def train(self, num_epochs, stats_interval=5):
+    def train(self, early_stopping, num_epochs, stats_interval=5):
         """Trains a model for a set number of epochs.
 
         Args:
@@ -131,18 +153,47 @@ class Optimiser(object):
         """
         start_train_time = time.time()
         run_stats = [list(self.get_epoch_stats().values())]
+
         with self.tqdm_progress(total=num_epochs) as progress_bar:
             progress_bar.set_description("Exp Prog")
+            # Keep track of the validation errors and the avg valid error of the 5 previous epochs
+            valid_accuracies = []
+            avg_valid_accuracy = 0
+            early_stopping_stats = dict()
+
             for epoch in range(1, num_epochs + 1):
                 start_time = time.time()
                 self.do_training_epoch()
-                epoch_time = time.time()- start_time
+                epoch_time = time.time() - start_time
                 if epoch % stats_interval == 0:
                     stats = self.get_epoch_stats()
+
+                    # Early stopping started
+                    if early_stopping is True:
+                        valid_acc = stats['acc(valid)']
+                        # Early stopping - get the average valid accuracy of the 5 last
+                        # accuracies and stop if it's greater than the last avg acc
+                        valid_accuracies.append(valid_acc)
+                        print(valid_accuracies)
+
+                        p = 10   # patience - average the last 5 acc
+                        if (epoch >= p):
+                            avg_valid_accuracy = np.sum(valid_accuracies[-p:]) / p
+                            print('epoch valid error', valid_acc)
+                            print('avg error', avg_valid_accuracy)
+
+                            if valid_acc < avg_valid_accuracy:
+                                print('TRAINING STOPPED:', epoch, 'valid acc:', valid_acc)
+
+                                # Run test set for this epoch only
+                                self.do_test_epoch()
+                                early_stopping_stats['epoch'] = epoch
+                                early_stopping_stats['stats'] = stats
+                                break
+
                     self.log_stats(epoch, epoch_time, stats)
                     run_stats.append(list(stats.values()))
                 progress_bar.update(1)
         finish_train_time = time.time()
         total_train_time = finish_train_time - start_train_time
-        return np.array(run_stats), {k: i for i, k in enumerate(stats.keys())}, total_train_time
-
+        return np.array(run_stats), {k: i for i, k in enumerate(stats.keys())}, total_train_time, early_stopping_stats
