@@ -3,7 +3,7 @@ import numpy as np
 import logging
 import json
 from mlp.data_providers import MNISTDataProvider, EMNISTDataProvider
-from mlp.layers import AffineLayer, SoftmaxLayer, SigmoidLayer, ReluLayer, LeakyReluLayer
+from mlp.layers import AffineLayer, SoftmaxLayer, SigmoidLayer, ReluLayer, LeakyReluLayer, ParametricReluLayer, RandomReluLayer, ExponentialLinearUnitLayer
 from mlp.errors import CrossEntropySoftmaxError
 from mlp.models import MultipleLayerModel
 from mlp.initialisers import ConstantInit, GlorotUniformInit
@@ -14,7 +14,7 @@ from mlp.optimisers import Optimiser
 
 
 def train_model_and_plot_stats(
-        model, error, learning_rule, train_data, valid_data, test_data, num_epochs, stats_interval, f=None, notebook=True, early_stopping=False):
+        model, error, learning_rule, train_data, valid_data, test_data, num_epochs, stats_interval, early_stopping, notebook=True):
 
     # As well as monitoring the error over training also monitor classification
     # accuracy i.e. proportion of most-probable predicted classes being equal to targets
@@ -52,8 +52,8 @@ def train_model_and_plot_stats(
 
 def baseline_early_stopping():
     # Write best epoch number for each combination on file
-    with open('./baseline_results/early_stopping_avg_10.txt', 'w') as f:
-        i = 0
+    with open('./baseline_results/no_early_stopping.txt', 'w') as f:
+        c_id = 0
         for layer in hidden_layers:
             for hidden_unit in relu_hidden_units_per_layer:
                 layers = [
@@ -76,17 +76,46 @@ def baseline_early_stopping():
                 model = MultipleLayerModel(layers)
 
                 train_model_stats = train_model_and_plot_stats(
-                    model, error, learning_rule, train_data, valid_data, test_data, num_epochs, stats_interval, f, notebook=False, early_stopping=True)
+                    model, error, learning_rule, train_data, valid_data, test_data, num_epochs, stats_interval, early_stopping, notebook=False)
 
-                print('\n\n----- ID:', i, ' -----\n\n')
+                print('\n\n----- ID:', c_id, ' -----\n\n')
                 early_stopping_stats = train_model_stats[3]
-                early_stopping_stats['id'] = i
+                early_stopping_stats['id'] = c_id
                 early_stopping_stats['layers'] = layer
                 early_stopping_stats['hidden_units'] = hidden_unit
                 f.write('-' * 20 + '\n')
                 f.write(json.dumps(early_stopping_stats))
                 f.write('\n')
-                i += 1
+                c_id = c_id + 1
+                print('\n\n----- ID + 1:', c_id, ' -----\n\n')
+
+
+def run_experiment(model, early_stopping, hidden_dim, alpha=None, filename_path=None, msg=None, write_to_file=False):
+    model = MultipleLayerModel([
+        AffineLayer(input_dim, hidden_dim, weights_init, biases_init),
+        model() if alpha is None else model(alpha=alpha),
+        AffineLayer(hidden_dim, hidden_dim, weights_init, biases_init),
+        model() if alpha is None else model(alpha=alpha),
+        AffineLayer(hidden_dim, hidden_dim, weights_init, biases_init),
+        model() if alpha is None else model(alpha=alpha),
+        AffineLayer(hidden_dim, output_dim, weights_init, biases_init)
+    ])
+
+    print(model)
+
+    relu_stats = train_model_and_plot_stats(
+        model, error, learning_rule, train_data, valid_data, test_data, num_epochs, stats_interval, early_stopping, notebook=False)
+
+    relu_stats = relu_stats[3]
+
+    if write_to_file is True:
+        with open(filename_path + '.txt', 'w') as f:
+            f.write('-' * 10 + msg + '-' * 10 + '\n')
+            f.write(json.dumps(relu_stats))
+            f.write('\n')
+            print('File saved at', filename_path)
+
+    return relu_stats
 
 
 # The below code will set up the data providers, random number
@@ -137,31 +166,37 @@ hidden_layers = [1, 2, 3, 4, 5]
 relu_hidden_units_per_layer = [32, 64, 128]
 
 error = CrossEntropySoftmaxError()
-# Use a basic gradient descent learning rule
+# 2 - Use a basic gradient descent learning rule
 learning_rule = AdamLearningRule()
-baseline_early_stopping()
+# baseline_early_stopping()
 
-# Test combinations on test data
-# epochs = [30, 23, 10, 19, 12, 9, 12, 11, 8]
-# counter = 0
-# test_accuracies = dict()
+# ------------------------
+#
+# 3 - Experiments
+#
+# ------------------------
+hidden_layers = 3
+hidden_dim = 128
+test_data = None
+# Success
+# run_experiment(LeakyReluLayer, True, hidden_dim, './experiments/leaky', 'L-RELU')  # 85.55
+# run_experiment(RandomReluLayer, True, hidden_dim, './experiments/random', 'R-RELU')  # 83.66
+# run_experiment(ExponentialLinearUnitLayer, True, hidden_dim, './experiments/elu', 'ELU')  # 85.48
 
-# for layer in hidden_layers:
-#     for hidden_unit in relu_hidden_units_per_layer:
-#         num_epochs = epochs[counter]
-#         print(layer, 'layer,', hidden_unit, 'hidden units\n')
 
-#         stats, keys, run_time, fig_1, ax_1, fig_2, ax_2 = train_model_and_plot_stats(
-#             model, error, learning_rule, train_data, test_data, num_epochs, stats_interval, notebook=False)
-#         print('test acc:', stats[1:, keys['acc(valid)']])
-#         key = str(layer) + '_' + str(hidden_unit)
-#         test_accuracies[key] = stats[1:, keys['acc(valid)']]
-#         counter += 1
+# Need testing
+# run_experiment(ParametricReluLayer, True, hidden_dim, './experiments/parametric', 'P-RELU')
 
-# print('\n')
-# print(test_accuracies)
 
-# Write test accuracy to a file
-# with open('./baseline_results/test_set_accuracy', 'w+') as test_set_file:
-#     for key in test_accuracies:
-#         test_set_file.write('' + key + ': ' + str([acc for acc in test_accuracies]))
+# Test hyperparameters
+alphas = [0.001, 0.01, 0.1, 0.2]
+
+with open('./experiments/leaky/leaky_alphas.txt', 'w+') as f:
+    for alpha in alphas:
+        print('alpha', alpha)
+        f.write('alpha ' + str(alpha))
+        stats = run_experiment(LeakyReluLayer, True, hidden_dim, alpha)
+
+        f.write(json.dumps(stats))
+        f.write('\n')
+        print('File saved at ./experiments/leaky/leaky_alphas')

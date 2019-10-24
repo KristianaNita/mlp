@@ -174,8 +174,8 @@ class Optimiser(object):
                         # Early stopping - get the average valid accuracy of the 5 last
                         # accuracies and stop if it's greater than the last avg acc
                         valid_accuracies.append(valid_acc)
-                        print(valid_accuracies)
-
+                        print('early_stopping', early_stopping)
+                        print('')
                         p = 10   # patience - average the last 5 acc
                         if (epoch >= p):
                             avg_valid_accuracy = np.sum(valid_accuracies[-p:]) / p
@@ -186,10 +186,16 @@ class Optimiser(object):
                                 print('TRAINING STOPPED:', epoch, 'valid acc:', valid_acc)
 
                                 # Run test set for this epoch only
-                                self.do_test_epoch()
+                                if self.test_dataset is not None:
+                                    self.do_test_epoch()
                                 early_stopping_stats['epoch'] = epoch
                                 early_stopping_stats['stats'] = stats
                                 break
+                        else:
+                            if self.test_dataset is not None:
+                                self.do_test_epoch()
+                            early_stopping_stats['epoch'] = epoch
+                            early_stopping_stats['stats'] = stats
 
                     self.log_stats(epoch, epoch_time, stats)
                     run_stats.append(list(stats.values()))
