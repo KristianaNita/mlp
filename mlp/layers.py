@@ -16,6 +16,7 @@ import numpy as np
 import mlp.initialisers as init
 from mlp import DEFAULT_SEED
 
+
 class Layer(object):
     """Abstract class defining the interface for a layer."""
 
@@ -368,6 +369,7 @@ class SigmoidLayer(Layer):
     def __repr__(self):
         return 'SigmoidLayer'
 
+
 class ReluLayer(Layer):
     """Layer implementing an element-wise rectified linear transformation."""
 
@@ -481,7 +483,7 @@ class ParametricReluLayer(LayerWithParameters):
 
         For inputs `x` and outputs `y` this corresponds to `y = ..., else`.
         """
-        return np.where(inputs > 0, inputs, self.alpha * np.exp(inputs))
+        return np.where(inputs > 0, inputs, self.alpha * inputs)
 
     def bprop(self, inputs, outputs, grads_wrt_outputs):
         """Back propagates gradients through a layer.
@@ -489,7 +491,7 @@ class ParametricReluLayer(LayerWithParameters):
         Given gradients with respect to the outputs of the layer calculates the
         gradients with respect to the layer inputs.
         """
-        return np.where(inputs > 0, 1 * grads_wrt_outputs, grads_wrt_outputs * self.alpha)
+        return np.where(inputs > 0, grads_wrt_outputs, self.alpha * grads_wrt_outputs)
 
     def grads_wrt_params(self, inputs, grads_wrt_outputs):
         """Calculates gradients with respect to layer parameters.
@@ -503,8 +505,9 @@ class ParametricReluLayer(LayerWithParameters):
             list of arrays of gradients with respect to the layer parameters
             `[grads_wrt_params]`. Where params is the alpha parameter.
         """
-        grads = (self.alpha * np.exp(2 * inputs) * grads_wrt_outputs)
-        return np.sum([np.where(inputs > 0, 0, grads)], axis=1)
+        grads_wrt_inputs = inputs * grads_wrt_outputs
+        grad = np.array([np.sum(np.where(inputs > 0, 0, grads_wrt_inputs))])
+        return [grad]
 
     @property
     def params(self):
@@ -748,6 +751,7 @@ class DropoutLayer(StochasticLayer):
 
     def __repr__(self):
         return 'DropoutLayer(incl_prob={0:.1f})'.format(self.incl_prob)
+
 
 class ReshapeLayer(Layer):
     """Layer which reshapes dimensions of inputs."""

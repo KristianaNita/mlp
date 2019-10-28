@@ -132,8 +132,7 @@ class MultipleLayerModel(object):
             outputs = activations[-i - 1]
             grads_wrt_inputs = layer.bprop(inputs, outputs, grads_wrt_outputs)
             if isinstance(layer, LayerWithParameters) or isinstance(layer, StochasticLayerWithParameters):
-                grads_wrt_params += layer.grads_wrt_params(
-                    inputs, grads_wrt_outputs)[::-1]
+                grads_wrt_params += layer.grads_wrt_params(inputs, grads_wrt_outputs)[::-1]
             grads_wrt_outputs = grads_wrt_inputs
         return grads_wrt_params[::-1]
 

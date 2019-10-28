@@ -2,6 +2,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import logging
 import json
+import os
 from mlp.data_providers import MNISTDataProvider, EMNISTDataProvider
 from mlp.layers import AffineLayer, SoftmaxLayer, SigmoidLayer, ReluLayer, LeakyReluLayer, ParametricReluLayer, RandomReluLayer, ExponentialLinearUnitLayer
 from mlp.errors import CrossEntropySoftmaxError
@@ -14,7 +15,7 @@ from mlp.optimisers import Optimiser
 
 
 def train_model_and_plot_stats(
-        model, error, learning_rule, train_data, valid_data, test_data, num_epochs, stats_interval, early_stopping, notebook=True):
+        model, error, learning_rule, train_data, valid_data, test_data, num_epochs, stats_interval, early_stopping, notebook=False):
 
     # As well as monitoring the error over training also monitor classification
     # accuracy i.e. proportion of most-probable predicted classes being equal to targets
@@ -22,7 +23,7 @@ def train_model_and_plot_stats(
 
     # Use the created objects to initialise a new Optimiser instance.
     optimiser = Optimiser(
-        model, error, learning_rule, train_data, valid_data, test_data, data_monitors, notebook=notebook)
+        model, error, learning_rule, train_data, valid_data, test_data, data_monitors, notebook=False)
 
     # Run the optimiser for 5 epochs (full passes through the training set)
     # printing statistics every epoch.
@@ -50,9 +51,9 @@ def train_model_and_plot_stats(
     return stats, keys, run_time, early_stopping_res, fig_1, ax_1, fig_2, ax_2
 
 
-def baseline_early_stopping():
+def baseline_early_stopping(early_stopping=True):
     # Write best epoch number for each combination on file
-    with open('./baseline_results/no_early_stopping.txt', 'w') as f:
+    with open('./baseline_results/early_stopping_new.txt', 'w') as f:
         c_id = 0
         for layer in hidden_layers:
             for hidden_unit in relu_hidden_units_per_layer:
@@ -90,18 +91,16 @@ def baseline_early_stopping():
                 print('\n\n----- ID + 1:', c_id, ' -----\n\n')
 
 
-def run_experiment(model, early_stopping, hidden_dim, alpha=None, filename_path=None, msg=None, write_to_file=False):
+def run_experiment(non_linearity, early_stopping, input_dim, hidden_dim, output_dim, alpha=None, filename_path=None, msg=None, write_to_file=False):
     model = MultipleLayerModel([
         AffineLayer(input_dim, hidden_dim, weights_init, biases_init),
-        model() if alpha is None else model(alpha=alpha),
+        non_linearity() if alpha is None else non_linearity(alpha=alpha),
         AffineLayer(hidden_dim, hidden_dim, weights_init, biases_init),
-        model() if alpha is None else model(alpha=alpha),
+        non_linearity() if alpha is None else non_linearity(alpha=alpha),
         AffineLayer(hidden_dim, hidden_dim, weights_init, biases_init),
-        model() if alpha is None else model(alpha=alpha),
+        non_linearity() if alpha is None else non_linearity(alpha=alpha),
         AffineLayer(hidden_dim, output_dim, weights_init, biases_init)
     ])
-
-    print(model)
 
     relu_stats = train_model_and_plot_stats(
         model, error, learning_rule, train_data, valid_data, test_data, num_epochs, stats_interval, early_stopping, notebook=False)
@@ -110,12 +109,95 @@ def run_experiment(model, early_stopping, hidden_dim, alpha=None, filename_path=
 
     if write_to_file is True:
         with open(filename_path + '.txt', 'w') as f:
-            f.write('-' * 10 + msg + '-' * 10 + '\n')
+            # f.write('-' * 10 + msg + '-' * 10 + '\n')
             f.write(json.dumps(relu_stats))
             f.write('\n')
             print('File saved at', filename_path)
 
     return relu_stats
+
+
+def heatmap(cmap=plt.cm.RdYlGn):
+    layers = [1, 2, 3]
+    hidden_units = [32, 64, 128]
+    # valid_accuracies = np.random.rand(9).reshape(3, 3)
+    valid_accuracies = np.array([
+        0.7715189873417719,
+        0.8124050632911389,
+        0.8284177215189871,
+        0.779873417721519,
+        0.8152531645569618,
+        0.8371518987341771,
+        0.7760759493670888,
+        0.8046202531645571,
+        0.8316455696202534
+    ]).reshape(3, 3)
+    print(valid_accuracies)
+
+    plt.imshow(valid_accuracies, cmap=cmap, interpolation='nearest')
+    for i in np.arange(3):
+        for j in np.arange(3):
+            val = valid_accuracies[j, i]
+            # if i == 1:
+            plt.text(i, j, '%.3f' % val, ha='center', va='center')
+
+    plt.xticks(np.arange(len(layers)), hidden_units)
+    plt.yticks(np.arange(len(hidden_units))[::-1], layers[::-1])
+    bottom, top = plt.ylim()
+    print(bottom, top)
+    plt.ylim([-0.5, 2.5])
+    plt.ylabel('Layers')
+    plt.xlabel('Hidden units')
+    # plt.title("Number of layers and hidden units that maximise the validation accuracy ")
+
+    plt.colorbar()
+    plt.tight_layout()
+    plt.savefig('./plots/heatmap.pdf', bbox_inches='tight')
+
+    plt.show()
+
+
+# Linear vs non-linear
+# Linear will be the same because if we have 2 matrices: NxK, KxM it's the same as doing NxM.
+# Linearity won't transform the inputs
+def compare_with_linear():
+    model = MultipleLayerModel([
+        AffineLayer(input_dim, hidden_dim, weights_init, biases_init),
+        AffineLayer(hidden_dim, hidden_dim, weights_init, biases_init),
+        AffineLayer(hidden_dim, output_dim, weights_init, biases_init)
+    ])
+
+    relu_stats = train_model_and_plot_stats(
+        model, error, learning_rule, train_data, valid_data, test_data, num_epochs, stats_interval, True, notebook=False)
+
+    relu_stats = relu_stats[3]
+
+    filename = './experiments/linear/linear_compare'
+    with open(filename + '.txt', 'w') as f:
+        f.write(json.dumps(relu_stats))
+        f.write('\n')
+        print('File saved at', filename)
+
+
+def create_directory(directory):
+    if not os.path.isdir(directory):
+        os.makedirs(directory)
+
+
+def run_experiment_with_parameters(params, filename, model, input_dim, hidden_dim, output_dim):
+    # filename = './experiments/elu/ELU_alpha_stats.txt'
+    with open(filename, 'w+') as f:
+        param_dict = dict()
+
+        for param in params:
+            print('alpha:', param)
+            stats = run_experiment(model, True, input_dim, hidden_dim, output_dim, param)
+            param_dict[param] = stats
+            f.write(json.dumps(param_dict))
+            f.write('\n')
+
+        print(param_dict.keys())
+        print('File saved at', filename)
 
 
 # The below code will set up the data providers, random number
@@ -162,7 +244,7 @@ model = MultipleLayerModel([
 ])
 
 # Run baseline for a combination of parameters
-hidden_layers = [1, 2, 3, 4, 5]
+hidden_layers = [1, 2, 3]
 relu_hidden_units_per_layer = [32, 64, 128]
 
 error = CrossEntropySoftmaxError()
@@ -175,28 +257,126 @@ learning_rule = AdamLearningRule()
 # 3 - Experiments
 #
 # ------------------------
-hidden_layers = 3
+# hidden_layers = 3
 hidden_dim = 128
-test_data = None
+
 # Success
-# run_experiment(LeakyReluLayer, True, hidden_dim, './experiments/leaky', 'L-RELU')  # 85.55
-# run_experiment(RandomReluLayer, True, hidden_dim, './experiments/random', 'R-RELU')  # 83.66
-# run_experiment(ExponentialLinearUnitLayer, True, hidden_dim, './experiments/elu', 'ELU')  # 85.48
+# run_experiment(LeakyReluLayer, True, input_dim, hidden_dim, output_dim, './experiments/leaky', 'L-RELU')  # 85.55
+# run_experiment(RandomReluLayer, True, input_dim, hidden_dim, output_dim, './experiments/random', 'R-RELU')  # 83.66
+# run_experiment(ExponentialLinearUnitLayer, True, input_dim, hidden_dim, output_dim, './experiments/elu', 'ELU')  # 85.48
 
 
 # Need testing
-# run_experiment(ParametricReluLayer, True, hidden_dim, './experiments/parametric', 'P-RELU')
+# run_experiment(ParametricReluLayer, True, input_dim, hidden_dim, output_dim, None, './experiments/parametric/parametric', 'P-RELU', True)
+
+# ------ Random relu -----------
+# Test hyperparameters on Random relu
+lower = [1 / 10, 1 / 8, 1 / 6]
+upper = [1 / 4, 1 / 3, 1 / 2]
+
+# filename = './experiments/random/random_bounds_new.txt'
+# with open(filename, 'w+') as f:
+#     for l in lower:
+#         for u in upper:
+#             model = MultipleLayerModel([
+#                 AffineLayer(input_dim, hidden_dim, weights_init, biases_init),
+#                 RandomReluLayer(lower=l, upper=u),
+#                 AffineLayer(hidden_dim, hidden_dim, weights_init, biases_init),
+#                 RandomReluLayer(lower=l, upper=u),
+#                 AffineLayer(hidden_dim, hidden_dim, weights_init, biases_init),
+#                 RandomReluLayer(lower=l, upper=u),
+#                 AffineLayer(hidden_dim, output_dim, weights_init, biases_init)
+#             ])
+
+#             print(model)
+
+#             stats = train_model_and_plot_stats(
+#                 model, error, learning_rule, train_data, valid_data, test_data, num_epochs, stats_interval, True, notebook=False)
+#             stats = stats[3]
+
+#             f.write('lower ' + str(l) + ', upper ' + str(u))
+#             f.write(json.dumps(stats))
+#             f.write('\n')
+#             print('File saved at', filename)
 
 
+# --------- Leaky and Parametric ---------
 # Test hyperparameters
-alphas = [0.001, 0.01, 0.1, 0.2]
+exponential_alphas = [0.001, 0.01, 0.1, 1, 10]
+filename = './experiments/elu/elu_alphas.txt'
 
-with open('./experiments/leaky/leaky_alphas.txt', 'w+') as f:
-    for alpha in alphas:
-        print('alpha', alpha)
-        f.write('alpha ' + str(alpha))
-        stats = run_experiment(LeakyReluLayer, True, hidden_dim, alpha)
+# with open(filename, 'w+') as f:
+#     for alpha in exponential_alphas:
+#         print('alpha', alpha)
+#         f.write('alpha ' + str(alpha))
+#         stats = run_experiment(ExponentialLinearUnitLayer, True, input_dim, hidden_dim, output_dim, alpha)
 
-        f.write(json.dumps(stats))
-        f.write('\n')
-        print('File saved at ./experiments/leaky/leaky_alphas')
+#         f.write(json.dumps(stats))
+#         f.write('\n')
+#     print('File saved at', filename)
+
+
+# parametric_alphas = [0.1, 0.25, 0.5, 0.75]
+# filename = './experiments/parametric/parametric_alphas.txt'
+
+# with open(filename, 'w+') as f:
+#     for alpha in parametric_alphas:
+#         print('alpha', alpha)
+#         f.write('alpha ' + str(alpha))
+#         stats = run_experiment(ParametricReluLayer, True, input_dim, hidden_dim, output_dim, alpha)
+
+#         f.write(json.dumps(stats))
+#         f.write('\n')
+#     print('File saved at', filename)
+
+
+activation_funcs = ['relu', 'leaky', 'random', 'elu', 'parametric', 'linear']
+for func in activation_funcs:
+    create_directory('./experiments/' + func)
+
+
+# Plot each model with default parameters using early stopping
+# run_experiment(ReluLayer, True, input_dim, hidden_dim, output_dim, None, './experiments/relu/ReLU_stats', 'RELU', True)
+run_experiment(LeakyReluLayer, True, input_dim, hidden_dim, output_dim, None, './experiments/leaky/LReLU_test_stats', 'L-RELU', True)
+# run_experiment(RandomReluLayer, True, input_dim, hidden_dim, output_dim, None, './experiments/random/RReLU_stats', 'R-RELU', True)  # 83.66
+# run_experiment(ExponentialLinearUnitLayer, True, input_dim, hidden_dim, output_dim, None, './experiments/elu/ELU_stats', 'ELU', True)
+# run_experiment(ParametricReluLayer, True, input_dim, hidden_dim, output_dim, None, './experiments/parametric/PReLU_stats', 'PRelu', True)
+
+# @TODO: Plot one model with different alphas
+# @TODO: Table with results on test set
+
+# Train with different params
+elu_leaky_alphas = [0.001, 0.01, 0.1, 1, 10]
+# run_experiment_with_parameters(elu_leaky_alphas, './experiments/leaky/LReLU_alpha_stats.txt', LeakyReluLayer, input_dim, hidden_dim, output_dim)
+# run_experiment_with_parameters(elu_leaky_alphas, './experiments/leaky/ELU_alpha_stats.txt', ExponentialLinearUnitLayer, input_dim, hidden_dim, output_dim)
+
+# run_random_relu_with_parameter_bounds()
+# lower = [1 / 10, 1 / 8, 1 / 6]
+# upper = [1 / 4, 1 / 3, 1 / 2]
+# filename = './experiments/random/RReLU_alpha_stats'
+# with open(filename, 'w+') as f:
+#     param_dict = dict()
+
+#     for l in lower:
+#         for u in upper:
+#             print('lower:', l)
+#             print('upper:', u)
+#             model = MultipleLayerModel([
+#                 AffineLayer(input_dim, hidden_dim, weights_init, biases_init),
+#                 RandomReluLayer(lower=l, upper=u),
+#                 AffineLayer(hidden_dim, hidden_dim, weights_init, biases_init),
+#                 RandomReluLayer(lower=l, upper=u),
+#                 AffineLayer(hidden_dim, hidden_dim, weights_init, biases_init),
+#                 RandomReluLayer(lower=l, upper=u),
+#                 AffineLayer(hidden_dim, output_dim, weights_init, biases_init)
+#             ])
+#             stats = train_model_and_plot_stats(
+#                 model, error, learning_rule, train_data, valid_data, test_data, num_epochs, stats_interval, True, notebook=False)
+#             stats = stats[3]
+#             full_param = str(l) + '_' + str(u)
+#             param_dict[full_param] = stats
+#             f.write(json.dumps(param_dict))
+#             f.write('\n')
+
+#     print(param_dict.keys())
+#     print('File saved at', filename)

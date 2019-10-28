@@ -134,7 +134,7 @@ class Optimiser(object):
         """
         logger.info('Epoch {0}: {1:.1f}s to complete\n    {2}'.format(
             epoch, epoch_time,
-            ', '.join(['{}={:.2e}'.format(k, v) for (k, v) in stats.items()])
+            ', '.join(['{}={:.2e}'.format(k, v) for (k, v) in stats.items() if 'test' not in k])
         ))
 
     def train(self, early_stopping, num_epochs, stats_interval=5):
@@ -156,10 +156,11 @@ class Optimiser(object):
 
         with self.tqdm_progress(total=num_epochs) as progress_bar:
             progress_bar.set_description("Exp Prog")
-            # Keep track of the validation errors and the avg valid error of the 5 previous epochs
-            valid_accuracies = []
-            avg_valid_accuracy = 0
-            early_stopping_stats = dict()
+            # Keep track of the validation accuracies and the avg valid error of the 5 previous epochs
+            early_stopping_stats = []
+            max_acc = 0
+            patience_value = 5
+            stop_counddown = 5
 
             for epoch in range(1, num_epochs + 1):
                 start_time = time.time()
@@ -173,29 +174,28 @@ class Optimiser(object):
                         valid_acc = stats['acc(valid)']
                         # Early stopping - get the average valid accuracy of the 5 last
                         # accuracies and stop if it's greater than the last avg acc
-                        valid_accuracies.append(valid_acc)
-                        print('early_stopping', early_stopping)
-                        print('')
-                        p = 10   # patience - average the last 5 acc
-                        if (epoch >= p):
-                            avg_valid_accuracy = np.sum(valid_accuracies[-p:]) / p
-                            print('epoch valid error', valid_acc)
-                            print('avg error', avg_valid_accuracy)
 
-                            if valid_acc < avg_valid_accuracy:
-                                print('TRAINING STOPPED:', epoch, 'valid acc:', valid_acc)
+                        if (epoch >= patience_value):
+                            if valid_acc > max_acc:
+                                max_acc = valid_acc
+                                if stop_counddown < patience_value:
+                                    stop_counddown = patience_value
+                            else:
+                                # Update countdown
+                                stop_counddown -= 1
 
+                            if stop_counddown == 0:
                                 # Run test set for this epoch only
                                 if self.test_dataset is not None:
                                     self.do_test_epoch()
-                                early_stopping_stats['epoch'] = epoch
-                                early_stopping_stats['stats'] = stats
+                                early_stopping_stats.append((epoch, *stats.values()))
                                 break
+                            else:
+                                early_stopping_stats.append((epoch, *stats.values()))
                         else:
                             if self.test_dataset is not None:
                                 self.do_test_epoch()
-                            early_stopping_stats['epoch'] = epoch
-                            early_stopping_stats['stats'] = stats
+                            early_stopping_stats.append((epoch, *stats.values()))
 
                     self.log_stats(epoch, epoch_time, stats)
                     run_stats.append(list(stats.values()))

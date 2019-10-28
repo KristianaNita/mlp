@@ -1,0 +1,9 @@
+lower 0.1, upper 0.25{"epoch": 18, "stats": {"error(train)": 0.2771363755039499, "acc(train)": 0.8935899999999966, "error(valid)": 0.523473330506703, "acc(valid)": 0.8384177215189875}}
+lower 0.1, upper 0.3333333333333333{"epoch": 13, "stats": {"error(train)": 0.35975970647525635, "acc(train)": 0.8687399999999997, "error(valid)": 0.5327250313206893, "acc(valid)": 0.8285443037974681}}
+lower 0.1, upper 0.5{"epoch": 15, "stats": {"error(train)": 0.3824081484146643, "acc(train)": 0.862510000000001, "error(valid)": 0.5290758060091303, "acc(valid)": 0.8266455696202527}}
+lower 0.125, upper 0.25{"epoch": 15, "stats": {"error(train)": 0.3012288064080243, "acc(train)": 0.8870599999999974, "error(valid)": 0.5239404495465686, "acc(valid)": 0.8368354430379745}}
+lower 0.125, upper 0.3333333333333333{"epoch": 14, "stats": {"error(train)": 0.34082633963594394, "acc(train)": 0.8741299999999995, "error(valid)": 0.5304010871392313, "acc(valid)": 0.8320253164556967}}
+lower 0.125, upper 0.5{"epoch": 21, "stats": {"error(train)": 0.3621938778335322, "acc(train)": 0.8675100000000003, "error(valid)": 0.5489580938419211, "acc(valid)": 0.8283544303797464}}
+lower 0.16666666666666666, upper 0.25{"epoch": 20, "stats": {"error(train)": 0.2711703709029718, "acc(train)": 0.8949699999999962, "error(valid)": 0.5663160359004416, "acc(valid)": 0.8336075949367083}}
+lower 0.16666666666666666, upper 0.3333333333333333{"epoch": 16, "stats": {"error(train)": 0.3181654829932538, "acc(train)": 0.8809899999999988, "error(valid)": 0.525931788624783, "acc(valid)": 0.8333544303797464}}
+lower 0.16666666666666666, upper 0.5{"epoch": 16, "stats": {"error(train)": 0.38142614459030816, "acc(train)": 0.8611300000000016, "error(valid)": 0.5353098099579303, "acc(valid)": 0.8235443037974686}}

@@ -1,0 +1,5 @@
+alpha 0.001{"epoch": 14, "stats": {"error(train)": 0.27064455629615436, "acc(train)": 0.8951999999999952, "error(valid)": 0.5271558791643444, "acc(valid)": 0.8380379746835447}}
+alpha 0.01{"epoch": 15, "stats": {"error(train)": 0.2602043779062081, "acc(train)": 0.8986799999999953, "error(valid)": 0.5432524721048012, "acc(valid)": 0.8367721518987339}}
+alpha 0.1{"epoch": 14, "stats": {"error(train)": 0.26654070607914077, "acc(train)": 0.8965099999999961, "error(valid)": 0.5281667937445358, "acc(valid)": 0.8363291139240507}}
+alpha 1{"epoch": 18, "stats": {"error(train)": 0.21491943178221345, "acc(train)": 0.915299999999996, "error(valid)": 0.5687445181708254, "acc(valid)": 0.8372151898734176}}
+alpha 10{"epoch": 17, "stats": {"error(train)": 0.5783229423025827, "acc(train)": 0.8057299999999983, "error(valid)": 0.7367317694419628, "acc(valid)": 0.7762658227848099}}
